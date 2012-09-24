@@ -31,27 +31,44 @@ namespace Raven.Database.Queries
 			IndexSearcher currentIndexSearcher;
 			using (database.IndexStorage.GetCurrentIndexSearcher(index, out currentIndexSearcher))
 			{
-				foreach (var facet in facets)
-				{
-					switch (facet.Mode)
-					{
-						case FacetMode.Default:
-							HandleTermsFacet(index, facet, indexQuery, currentIndexSearcher, results);
-							break;
-						case FacetMode.Ranges:
-							HandleRangeFacet(index, facet, indexQuery, currentIndexSearcher, results);
-							break;
-						default:
-							throw new ArgumentException(string.Format("Could not understand '{0}'", facet.Mode));
-					}
-				}
-
+				DoGetFacets(index, indexQuery, facets, currentIndexSearcher, results);
 			}
 
 			return results;
 		}
 
-		private void HandleRangeFacet(string index, Facet facet, IndexQuery indexQuery, IndexSearcher currentIndexSearcher, Dictionary<string, IEnumerable<FacetValue>> results)
+		private void DoGetFacets(string index, IndexQuery indexQuery, List<Facet> facets, IndexSearcher currentIndexSearcher, IDictionary<string, IEnumerable<FacetValue>> results)
+		{
+			foreach (var facet in facets)
+			{
+				switch (facet.Mode)
+				{
+					case FacetMode.Default:
+						HandleTermsFacet(index, facet, indexQuery, currentIndexSearcher, results);
+						HandleChildren(index, indexQuery, currentIndexSearcher, results, facet);
+						break;
+					case FacetMode.Ranges:
+						HandleRangeFacet(index, facet, indexQuery, currentIndexSearcher, results);
+						HandleChildren(index, indexQuery, currentIndexSearcher, results, facet);
+						break;
+					default:
+						throw new ArgumentException(string.Format("Could not understand '{0}'", facet.Mode));
+				}
+			}
+		}
+
+		private void HandleChildren(string index, IndexQuery indexQuery, IndexSearcher currentIndexSearcher, IDictionary<string, IEnumerable<FacetValue>> results,
+		                            Facet facet)
+		{
+			foreach (var result in results[facet.Name])
+			{
+				var childQuery = indexQuery.Clone();
+				childQuery.Query += " AND " + facet.Name + ":" + result.Range;
+				DoGetFacets(index, childQuery, facet.Children, currentIndexSearcher, result.Children);
+			}
+		}
+
+		private void HandleRangeFacet(string index, Facet facet, IndexQuery indexQuery, IndexSearcher currentIndexSearcher, IDictionary<string, IEnumerable<FacetValue>> results)
 		{
 			var rangeResults = new List<FacetValue>();
 			foreach (var range in facet.Ranges)
@@ -83,7 +100,7 @@ namespace Raven.Database.Queries
 			results[facet.Name] = rangeResults;
 		}
 
-		private void HandleTermsFacet(string index, Facet facet, IndexQuery indexQuery, IndexSearcher currentIndexSearcher, Dictionary<string, IEnumerable<FacetValue>> results)
+		private void HandleTermsFacet(string index, Facet facet, IndexQuery indexQuery, IndexSearcher currentIndexSearcher, IDictionary<string, IEnumerable<FacetValue>> results)
 		{
 			var terms = database.ExecuteGetTermsQuery(index,
 													  facet.Name, null,

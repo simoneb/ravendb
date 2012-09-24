@@ -57,7 +57,24 @@ namespace Raven.Tests.Faceted
 			          						"[Dx7.0 TO Dx10.0]",
 			          						"[Dx10.0 TO NULL]",
 			          					}
-			          			}
+			          			},
+							new Facet
+								{
+									Name = "Model",
+									Children = new List<Facet>
+										{
+											new Facet
+												{
+													Name = "Zoom_Range",
+													Mode = FacetMode.Ranges,
+													Ranges =
+														{
+															"[NULL TO Dx7.0]",
+			          										"[Dx7.0 TO NULL]",
+														}
+												}
+										}
+								}
 			          	};
 		}
 
@@ -93,7 +110,6 @@ namespace Raven.Tests.Faceted
 						x => x.DateOfListing > new DateTime(2000, 1, 1),
 						x => x.Megapixels > 5.0m && x.Cost < 500
 					};
-
 
 					foreach (var exp in expressions)
 					{
@@ -165,7 +181,6 @@ namespace Raven.Tests.Faceted
 			}
 		}
 
-
 		private void ExecuteTest(IDocumentStore store)
 		{
 			Setup(store);
@@ -214,7 +229,8 @@ namespace Raven.Tests.Faceted
                                                             camera.Model, 
                                                             camera.Cost,
                                                             camera.DateOfListing,
-                                                            camera.Megapixels
+                                                            camera.Megapixels,
+															camera.Zoom
                                                         }"
 												});
 
@@ -287,6 +303,18 @@ namespace Raven.Tests.Faceted
 							megapixelsFacets.FirstOrDefault(x => x.Range == "[Dx7.0 TO Dx10.0]"));
 			CheckFacetCount(filteredData.Where(x => x.Megapixels >= 10.0m).Count(),
 							megapixelsFacets.FirstOrDefault(x => x.Range == "[Dx10.0 TO NULL]"));
+
+			//Why not test also the hierarchical facet then?
+			foreach (var mainFacet in facetResults["Model"])
+			{
+				var inMemoryCount = filteredData.Count(x => x.Model.ToLower() == mainFacet.Range);
+				Assert.Equal(inMemoryCount, mainFacet.Count);
+
+				CheckFacetCount(filteredData.Count(x => x.Zoom <= 7.0m && x.Model.ToLower() == mainFacet.Range),
+								mainFacet.Children["Zoom_Range"].FirstOrDefault(x => x.Range == "[NULL TO Dx7.0]"));
+				CheckFacetCount(filteredData.Count(x => x.Zoom >= 7.0m && x.Model.ToLower() == mainFacet.Range),
+							mainFacet.Children["Zoom_Range"].FirstOrDefault(x => x.Range == "[Dx7.0 TO NULL]"));
+			}
 		}
 
 		private void CheckFacetCount(int expectedCount, FacetValue facets)

@@ -16,7 +16,7 @@ namespace Raven.Tests.Faceted
 		public string Model { get; set; }
 		public decimal Cost { get; set; }
 
-		public int Zoom { get; set; }
+		public decimal Zoom { get; set; }
 		public decimal Megapixels { get; set; }
 		public bool ImageStabiliser { get; set; }
 		public List<String> AdvancedFeatures { get; set; }
