@@ -210,6 +210,16 @@ namespace Raven.Tests.Faceted
 														@"from camera in docs 
                                                         select new 
                                                         { 
+															ManufacturerFacet = camera.AsFacet(c => c.Manufacturer),
+															CostFacet = camera.AsFacet(c => c.Cost, 
+																							c => c <= 200, 
+																							c > 200 && c <= 600, 
+																							c => c > 600),
+															ManufacturerCostFacet = camera.AsFacet(c => c.Manufacturer)
+																						  .AsFacet(c => c.Cost,
+																										c => c <= 200, 
+																										c > 200 && c <= 600, 
+																										c => c > 600),
                                                             camera.Manufacturer, 
                                                             camera.Model, 
                                                             camera.Cost,
